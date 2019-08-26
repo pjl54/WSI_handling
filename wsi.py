@@ -4,6 +4,10 @@
 # In[1]:
 
 
+import xml.etree.ElementTree as ET
+import numpy as np
+import cv2
+
 import PIL
 from PIL import Image,ImageDraw
 import operator
@@ -12,9 +16,10 @@ from shapely.geometry import Polygon
 import openslide
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 
-# In[174]:
+# In[2]:
 
 
 class wsi(dict):
@@ -31,7 +36,7 @@ class wsi(dict):
             
             self["img_dims"] = self["osh"].level_dimensions
     
-    def color_ref_match(colors_to_use):    
+    def color_ref_match(self,colors_to_use):    
         color_ref = [(65535,1,'yellow'),(65280,2,'green'),(255,3,'red'),(16711680,4,'blue'),(16711808,5,'purple')]    
         if colors_to_use is not None:
             color_map = [c for c in color_ref if c[2] in colors_to_use]
@@ -40,12 +45,12 @@ class wsi(dict):
 
         return color_map
     
-    def get_points(xmlfile,colors_to_use=None):        
+    def get_points(self,colors_to_use=None):        
 
-        color_map = color_ref_match(colors_to_use)    
+        color_map = self.color_ref_match(colors_to_use)    
 
         # create element tree object
-        tree = ET.parse(xmlfile)
+        tree = ET.parse(self["xml_fname"])
 
         # get root element
         root = tree.getroot()        
@@ -103,15 +108,12 @@ class wsi(dict):
         
         return img        
 
-    def mask_out_annotation(xml_fname,img_fname=None,desired_mpp=None,colors_to_use=None):        
+    def mask_out_annotation(self,desired_mpp=None,colors_to_use=None):        
     
-        points, map_idx = get_points(xml_fname,colors_to_use)
+        points, map_idx = self.get_points(colors_to_use)
 
         if img_fname is not None:
-            osh_img = openslide.OpenSlide(img_fname)
-            img_dim = osh_img.level_dimensions
-            img_mpp = round(float(osh_img.properties['openslide.mpp-x']),2)
-            resize_factor = img_mpp / desired_mpp                
+            resize_factor = self["mpp"] / desired_mpp                
         else:
             resize_factor = 1
 
@@ -127,6 +129,46 @@ class wsi(dict):
 
         return mask, resize_factor
 
+    def mask_out_region(self,desired_mpp,coords,wh,colors_to_use=None):
+    
+        points, map_idx = self.get_points(colors_to_use)
+
+        if img_fname is not None:
+            resize_factor = self["mpp"] / desired_mpp                
+        else:
+            resize_factor = 1
+
+        # this rounding may de-align the mask and RGB image
+        for k, pointSet in enumerate(points):
+            points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
+
+        coords = tuple([int(c * resize_factor) for c in coords])
+
+        polygon = np.array([[coords[0],coords[1]],[coords[0]+wh[0],coords[1]],[coords[0]+wh[0],coords[1]+wh[1]],[coords[0],coords[1]+wh[1]]])
+
+        new_points = []
+        for k, point_set in enumerate(points):                
+
+            if(all(mpl.path.Path(np.array(point_set)).contains_points(polygon))):
+                new_points.append(polygon)
+
+                region_point_set = [point for index,point in enumerate(point_set) if point[0]>coords[0] and point[0]<(coords[0]+wh[0])
+                                       and point[1]>coords[1] and point[1]<(coords[1]+wh[1])]
+
+                new_points.append(region_point_set)
+
+        img = Image.new('L', (wh[0], wh[1]), 0)
+
+        for k, pointSet in enumerate(points):
+            points[k] = [(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet]
+
+        for annCount, pointSet in enumerate(points):        
+            ImageDraw.Draw(img).polygon(pointSet, fill=map_idx[annCount])
+
+        mask = np.array(img)    
+
+        return mask
+    
     # coords is relative to the lowest-MPP layer, while wh is relative to desired_mpp
     def get_tile(self,desired_mpp,coords,wh):
 
@@ -158,7 +200,7 @@ class wsi(dict):
         return wsi_image
 
 
-# In[175]:
+# In[3]:
 
 
 xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
@@ -169,22 +211,28 @@ wh = (1024,1024)
 w = wsi(img_fname,xml_fname)
 
 
-# In[153]:
+# In[18]:
 
 
-print(w["mpps"])
+desired_mpp = 1
+coords = (9512,25596)
+wh = (1024,1024)
+
+x = np.random.randint(1000, high=17000, size=None, dtype='l')
+y = np.random.randint(25000, high=26000, size=None, dtype='l')
+coords = (x,y)
 
 
-# In[186]:
+fig, ax = plt.subplots(1,3,figsize=(20,20));
 
+mask = w.mask_out_region(1,coords,(1000,1000),'red')
+mask[0][0]=0
+mask[0][1]=1
+mask[0][2]=2
+mask[0][3]=3
+mask[0][4]=4
 
-img = w.show_tile_location(1,(9512,25596),(1000,1000))
-plt.imshow(img);
-
-
-# In[187]:
-
-
-img = w.show_tile_location(0.25,(9512,25596),(4000,4000))
-plt.imshow(img);
+ax[0].imshow(w.get_tile(1,coords,(1000,1000)))
+ax[1].imshow(w.show_tile_location(1,coords,(1000,1000)))
+ax[2].imshow(mask)
 
