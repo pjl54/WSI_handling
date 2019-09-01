@@ -1,7 +1,7 @@
 # WSI_handling
 Code snippets for handling digital pathology pyramidal slide images. Currently only works with annotation XMLs from Aperio ImageScope and image formats supported by Openslide.
 
-# Useage
+# Usage
 xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
 img_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.svs'
 desired_mpp = 0.25
