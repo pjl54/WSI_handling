@@ -37,6 +37,7 @@ class wsi(dict):
             self["img_dims"] = self["osh"].level_dimensions
     
     def color_ref_match(self,colors_to_use):    
+        """Given a string or list of strings corresponding to colors to use, returns the hexcodes of those colors"""
         
         if isinstance(colors_to_use,str):
             colors_to_use = colors_to_use.lower()
@@ -51,7 +52,8 @@ class wsi(dict):
 
         return color_map
     
-    def get_points(self,colors_to_use=None):        
+    def get_points(self,colors_to_use=None): 
+        """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
         
         color_map = self.color_ref_match(colors_to_use)    
 
@@ -82,6 +84,7 @@ class wsi(dict):
         return points, map_idx
         
     def get_coord_at_mpp(self,coordinate,output_mpp,input_mpp=None):
+        """Given a dimension or coordinate, returns what that input would be scaled to the given MPP"""
         
         if input_mpp is None:
             input_mpp = self["mpp"]
@@ -91,6 +94,7 @@ class wsi(dict):
         return coordinate
     
     def get_layer_for_mpp(self,desired_mpp,wh=None):
+        """Finds the highest-MPP layer with an MPP > desired_mpp, rescales dimensions to match that layer"""
         
         diff_mpps = [x for x in [mpp - float(desired_mpp) for mpp in self["mpps"]]]    
         valid_layers = [(index,diff_mpp) for index,diff_mpp in enumerate(diff_mpps) if diff_mpp>=0]
@@ -110,11 +114,13 @@ class wsi(dict):
         return target_layer, layer_scale, wh
             
     def read_region(self,coords,target_layer,wh):
+        """Returns an RGB image of the desired region, will use more libraries when implemented, for now just Openslide"""
         img = self["osh"].read_region(coords,target_layer,wh)
         
         return img        
 
     def mask_out_annotation(self,desired_mpp=None,colors_to_use=None):        
+        """Returns the mask of annotations. Annotations to be returned specified in colors_to_use. Which annotations are on top controlled by order of strings in colors_to_use"""
     
         points, map_idx = self.get_points(colors_to_use)
 
@@ -131,11 +137,10 @@ class wsi(dict):
         for annCount, pointSet in enumerate(points):        
             ImageDraw.Draw(img).polygon(pointSet, fill=map_idx[annCount])
 
-        mask = np.array(img)    
-
         return mask, resize_factor
 
     def mask_out_region(self,desired_mpp,coords,wh,colors_to_use=None):
+        """Returns the mask of a tile"""
     
         points, map_idx = self.get_points(colors_to_use)
 
@@ -174,6 +179,7 @@ class wsi(dict):
         return mask
     
     def get_tile(self,desired_mpp,coords,wh,wh_at_base=False):        
+        """Returns the RGB image of a tile. coords are at base MPP, wh is at desired_mpp unless wh_at_base=True, in which case wh is at base"""
         
         if wh_at_base:
             wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
@@ -188,6 +194,7 @@ class wsi(dict):
         return img
 
     def show_tile_location(self,desired_mpp,coords,wh,wsi_mpp=8):            
+        """Returns the whole image with a box showing where the tile of the given inputs would be located"""
         
         target_layer, layer_scale, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
         wsi_target_layer, wsi_layer_scale, wsi_scaled_wh = self.get_layer_for_mpp(wsi_mpp,wh)
@@ -204,6 +211,7 @@ class wsi(dict):
         return wsi_image
     
     def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True):
+        """Returns an RGB image of the specified annotated region."""
             
         points, _ = self.get_points(colors_to_use)
         
@@ -229,81 +237,4 @@ class wsi(dict):
             img = PIL.Image.composite(background,img,mask.point(lambda p: p == 0 and 255))
 
         return img, mask
-
-
-# In[99]:
-
-
-colors_to_use = ('green','yelLLw','red')
-colors_to_use = ('green')
-print(type(colors_to_use))
-print(isinstance(colors_to_use,str))
-colors_to_use = [color.lower() for color in colors_to_use]
-print(colors_to_use)
-
-
-# In[174]:
-
-
-xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
-img_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.svs'
-desired_mpp = 0.25
-wh = (1024,1024)
-
-w = wsi(img_fname,xml_fname)
-
-
-# In[177]:
-
-
-roi, mask = w.get_annotated_region(1,'green',0,mask_out_roi=True)
-
-fig, ax = plt.subplots(1,2,figsize=(20,20));
-
-mask.putpixel((0,0),0)
-# mask[0][1]=1
-# mask[0][2]=2
-# mask[0][3]=3
-# mask[0][4]=4
-
-ax[0].imshow(roi)
-ax[1].imshow(mask)
-
-
-# In[157]:
-
-
-plt.imshow(mask.point(lambda p: p > 0 and 255))
-
-
-# In[4]:
-
-
-desired_mpp = 1
-coords = (9512,25596)
-wh = (1024,1024)
-
-x = np.random.randint(1000, high=17000, size=None, dtype='l')
-y = np.random.randint(25000, high=26000, size=None, dtype='l')
-coords = (x,y)
-
-
-fig, ax = plt.subplots(1,3,figsize=(20,20));
-
-mask = w.mask_out_region(1,coords,(1000,1000),'red')
-mask[0][0]=0
-mask[0][1]=1
-mask[0][2]=2
-mask[0][3]=3
-mask[0][4]=4
-
-ax[0].imshow(w.get_tile(1,coords,(1000,1000)))
-ax[1].imshow(w.show_tile_location(1,coords,(1000,1000)))
-ax[2].imshow(mask)
-
-
-# In[33]:
-
-
-
 
