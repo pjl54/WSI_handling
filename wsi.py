@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 
-# In[2]:
+# In[173]:
 
 
 class wsi(dict):
@@ -37,6 +37,12 @@ class wsi(dict):
             self["img_dims"] = self["osh"].level_dimensions
     
     def color_ref_match(self,colors_to_use):    
+        
+        if isinstance(colors_to_use,str):
+            colors_to_use = colors_to_use.lower()
+        else:
+            colors_to_use = [color.lower() for color in colors_to_use]
+        
         color_ref = [(65535,1,'yellow'),(65280,2,'green'),(255,3,'red'),(16711680,4,'blue'),(16711808,5,'purple')]    
         if colors_to_use is not None:
             color_map = [c for c in color_ref if c[2] in colors_to_use]
@@ -46,7 +52,7 @@ class wsi(dict):
         return color_map
     
     def get_points(self,colors_to_use=None):        
-
+        
         color_map = self.color_ref_match(colors_to_use)    
 
         # create element tree object
@@ -157,23 +163,23 @@ class wsi(dict):
 
                 new_points.append(region_point_set)
 
-        img = Image.new('L', (wh[0], wh[1]), 0)
+        mask = Image.new('L', (wh[0], wh[1]), 0)
 
         for k, pointSet in enumerate(points):
             points[k] = [(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet]
 
         for annCount, pointSet in enumerate(points):        
-            ImageDraw.Draw(img).polygon(pointSet, fill=map_idx[annCount])
-
-        mask = np.array(img)    
-
+            ImageDraw.Draw(mask).polygon(pointSet, fill=map_idx[annCount])        
+        
         return mask
     
-    # coords is relative to the lowest-MPP layer, while wh is relative to desired_mpp
-    def get_tile(self,desired_mpp,coords,wh):
-
+    def get_tile(self,desired_mpp,coords,wh,wh_at_base=False):        
+        
+        if wh_at_base:
+            wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
+        
         target_layer, _, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
-                    
+        
         img_image = self.read_region(coords,target_layer,scaled_wh)
 
         interp_method=PIL.Image.NEAREST
@@ -190,17 +196,53 @@ class wsi(dict):
         wsi_scaled_wh = tuple([self.get_coord_at_mpp(dimension,wsi_mpp,input_mpp=desired_mpp) for dimension in wh])        
         
         wsi_image = self.read_region((0,0),wsi_target_layer,self["img_dims"][wsi_target_layer])        
-                
-        print(rect_coords)        
+                    
         tile_rect = ImageDraw.Draw(wsi_image)
-        outer_point = tuple(map(operator.add,rect_coords,wsi_scaled_wh))
-        print(outer_point)
+        outer_point = tuple(map(operator.add,rect_coords,wsi_scaled_wh))        
         tile_rect.rectangle((rect_coords,outer_point),outline="#000000",width=10)
 
         return wsi_image
+    
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True):
+            
+        points, _ = self.get_points(colors_to_use)
+        
+        poly_list = [Polygon(point_set) for point_set in points]
+        
+        
+        if annotation_idx is 'largest':
+            areas = [poly.area for poly in poly_list]
+            annotation_idx = areas.index(max(areas))
+        
+        bounding_box = poly_list[annotation_idx].bounds
+
+        coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
+        wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
+        
+        img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
+        
+        wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
+        mask = self.mask_out_region(desired_mpp,coords,wh,colors_to_use=colors_to_use)
+        
+        if(mask_out_roi):
+            background = Image.new('L', img.size, color=255)        
+            img = PIL.Image.composite(background,img,mask.point(lambda p: p == 0 and 255))
+
+        return img, mask
 
 
-# In[3]:
+# In[99]:
+
+
+colors_to_use = ('green','yelLLw','red')
+colors_to_use = ('green')
+print(type(colors_to_use))
+print(isinstance(colors_to_use,str))
+colors_to_use = [color.lower() for color in colors_to_use]
+print(colors_to_use)
+
+
+# In[174]:
 
 
 xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
@@ -211,7 +253,30 @@ wh = (1024,1024)
 w = wsi(img_fname,xml_fname)
 
 
-# In[18]:
+# In[177]:
+
+
+roi, mask = w.get_annotated_region(1,'green',0,mask_out_roi=True)
+
+fig, ax = plt.subplots(1,2,figsize=(20,20));
+
+mask.putpixel((0,0),0)
+# mask[0][1]=1
+# mask[0][2]=2
+# mask[0][3]=3
+# mask[0][4]=4
+
+ax[0].imshow(roi)
+ax[1].imshow(mask)
+
+
+# In[157]:
+
+
+plt.imshow(mask.point(lambda p: p > 0 and 255))
+
+
+# In[4]:
 
 
 desired_mpp = 1
@@ -235,4 +300,10 @@ mask[0][4]=4
 ax[0].imshow(w.get_tile(1,coords,(1000,1000)))
 ax[1].imshow(w.show_tile_location(1,coords,(1000,1000)))
 ax[2].imshow(mask)
+
+
+# In[33]:
+
+
+
 
