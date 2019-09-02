@@ -8,31 +8,36 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 
+import matplotlib as mpl
+
+# import matplotlib.pyplot as plt
+# import time
+# import tqdm
+
 import PIL
 from PIL import Image,ImageDraw
 import operator
 
+import cv2
+
 from shapely.geometry import Polygon
 import openslide
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 
-
-# In[173]:
+# In[3]:
 
 
 class wsi(dict):
     
     def __init__(self,img_fname=None,xml_fname=None):
         self["img_fname"] = img_fname
-        self["xml_fname"] = xml_fname
+        self["xml_fname"] = xml_fname        
         
         if img_fname is not None:
             self["osh"] = openslide.OpenSlide(img_fname)
             self["mpp"] = float(self["osh"].properties['openslide.mpp-x'])
             self["downsamples"] = self["osh"].level_downsamples
-            self["mpps"] = [round(ds*self["mpp"],2) for ds in self["downsamples"]]            
+            self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]            
             
             self["img_dims"] = self["osh"].level_dimensions
     
@@ -124,7 +129,7 @@ class wsi(dict):
     
         points, map_idx = self.get_points(colors_to_use)
 
-        if img_fname is not None:
+        if self["img_fname"] is not None:
             resize_factor = self["mpp"] / desired_mpp                
         else:
             resize_factor = 1
@@ -132,19 +137,20 @@ class wsi(dict):
         for k, pointSet in enumerate(points):
             points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
 
-        img = Image.new('L', (int(img_dim[0][0] * resize_factor), int(img_dim[0][1] * resize_factor)), 0)
+        mask = np.zeros((int(self["img_dims"][0][1] * resize_factor), int(self["img_dims"][0][0] * resize_factor)))
 
-        for annCount, pointSet in enumerate(points):        
-            ImageDraw.Draw(img).polygon(pointSet, fill=map_idx[annCount])
-
+        for annCount, pointSet in enumerate(points):                    
+            cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
+            
         return mask, resize_factor
 
+    
     def mask_out_region(self,desired_mpp,coords,wh,colors_to_use=None):
         """Returns the mask of a tile"""
     
         points, map_idx = self.get_points(colors_to_use)
 
-        if img_fname is not None:
+        if self["img_fname"] is not None:
             resize_factor = self["mpp"] / desired_mpp                
         else:
             resize_factor = 1
@@ -168,28 +174,30 @@ class wsi(dict):
 
                 new_points.append(region_point_set)
 
-        mask = Image.new('L', (wh[0], wh[1]), 0)
+#         mask = Image.new('L', (wh[0], wh[1]), 0)
+        mask = np.zeros((wh[1],wh[0]))
 
         for k, pointSet in enumerate(points):
             points[k] = [(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet]
 
         for annCount, pointSet in enumerate(points):        
-            ImageDraw.Draw(mask).polygon(pointSet, fill=map_idx[annCount])        
+            cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
         
         return mask
-    
+        
     def get_tile(self,desired_mpp,coords,wh,wh_at_base=False):        
         """Returns the RGB image of a tile. coords are at base MPP, wh is at desired_mpp unless wh_at_base=True, in which case wh is at base"""
         
         if wh_at_base:
-            wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
+            wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
         
         target_layer, _, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
         
-        img_image = self.read_region(coords,target_layer,scaled_wh)
-
-        interp_method=PIL.Image.NEAREST
-        img = img_image.resize(wh, resample=interp_method)
+        img = self.read_region(coords,target_layer,scaled_wh)
+        img = np.array(img)
+        
+#         interp_method=cv2.INTER_CUIBC
+        img = cv2.resize(img,wh,interpolation=cv2.INTER_CUBIC)                
 
         return img
 
@@ -215,26 +223,32 @@ class wsi(dict):
             
         points, _ = self.get_points(colors_to_use)
         
-        poly_list = [Polygon(point_set) for point_set in points]
+        if(not points):
+            print('No annotations of selected color')
+            img = None
+            mask = None
+        else:
         
-        
-        if annotation_idx is 'largest':
-            areas = [poly.area for poly in poly_list]
-            annotation_idx = areas.index(max(areas))
-        
-        bounding_box = poly_list[annotation_idx].bounds
+            poly_list = [Polygon(point_set) for point_set in points]
 
-        coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
-        wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
-        
-        img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
-        
-        wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
-        mask = self.mask_out_region(desired_mpp,coords,wh,colors_to_use=colors_to_use)
-        
-        if(mask_out_roi):
-            background = Image.new('L', img.size, color=255)        
-            img = PIL.Image.composite(background,img,mask.point(lambda p: p == 0 and 255))
+
+            if annotation_idx.lower() == 'largest':
+                areas = [poly.area for poly in poly_list]
+                annotation_idx = areas.index(max(areas))
+
+            bounding_box = poly_list[annotation_idx].bounds
+
+            coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
+            wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
+
+            img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
+            img = np.asarray(img)
+
+            wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
+            mask = self.mask_out_region(desired_mpp,coords,wh,colors_to_use=colors_to_use)
+                        
+            if(mask_out_roi):
+                img = cv2.bitwise_and(img,img,mask=np.uint8(mask))
 
         return img, mask
 
