@@ -3,11 +3,8 @@ Code snippets for handling digital pathology pyramidal slide images. Currently o
 
 # Usage
 xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
-
 img_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.svs'
-
 desired_mpp = 0.25
-
 wh = (1024,1024)
 
 w = wsi(img_fname,xml_fname)
