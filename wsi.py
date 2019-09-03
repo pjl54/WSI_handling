@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[7]:
 
 
 import xml.etree.ElementTree as ET
@@ -24,7 +24,7 @@ from shapely.geometry import Polygon
 import openslide
 
 
-# In[3]:
+# In[2]:
 
 
 class wsi(dict):
@@ -101,7 +101,7 @@ class wsi(dict):
     def get_layer_for_mpp(self,desired_mpp,wh=None):
         """Finds the highest-MPP layer with an MPP > desired_mpp, rescales dimensions to match that layer"""
         
-        diff_mpps = [x for x in [mpp - float(desired_mpp) for mpp in self["mpps"]]]    
+        diff_mpps = [float(desired_mpp) - mpp for mpp in self["mpps"]]
         valid_layers = [(index,diff_mpp) for index,diff_mpp in enumerate(diff_mpps) if diff_mpp>=0]
         valid_diff_mpps = [v[1] for v in valid_layers]
         valid_layers= [v[0] for v in valid_layers]
