@@ -200,6 +200,12 @@ class wsi(dict):
         img = cv2.resize(img,wh,interpolation=cv2.INTER_CUBIC)                
 
         return img
+    
+    def get_wsi(self,desired_mpp):
+        """Returns the whole image"""                         
+        wsi_image = self.get_tile(desired_mpp=desired_mpp,coords=(0,0),wh=self["img_dims"][0],wh_at_base=True)
+        
+        return wsi_image
 
     def show_tile_location(self,desired_mpp,coords,wh,wsi_mpp=8):            
         """Returns the whole image with a box showing where the tile of the given inputs would be located"""
