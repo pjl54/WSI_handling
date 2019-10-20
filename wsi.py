@@ -1,7 +1,8 @@
+# %%
 
 # coding: utf-8
 
-# In[7]:
+# %%
 
 
 import xml.etree.ElementTree as ET
@@ -24,18 +25,24 @@ from shapely.geometry import Polygon
 import openslide
 
 
-# In[2]:
+# %%
 
 
 class wsi(dict):
     
-    def __init__(self,img_fname=None,xml_fname=None):
+    def __init__(self,img_fname=None,xml_fname=None, mpp=None):
         self["img_fname"] = img_fname
         self["xml_fname"] = xml_fname        
         
         if img_fname is not None:
             self["osh"] = openslide.OpenSlide(img_fname)
-            self["mpp"] = float(self["osh"].properties['openslide.mpp-x'])
+            
+            # if mpp is not provided in file
+            if mpp is not None:
+                self["mpp"] = mpp
+            else:
+                self["mpp"] = float(self["osh"].properties['openslide.mpp-x'])
+                
             self["downsamples"] = self["osh"].level_downsamples
             self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]            
             
