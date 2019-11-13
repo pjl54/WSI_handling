@@ -119,8 +119,8 @@ class wsi(dict):
         valid_diff_mpps = [v[1] for v in valid_layers]
         valid_layers= [v[0] for v in valid_layers]
         if len(valid_layers) == 0:
-            print('Warning: desired_mpp is lower than minimum image MPP of ' + min(self["mpps"]))
-            target_layer = diff_mpps.index(min([v[1] for v in valid_layers])) 
+            print('Warning: desired_mpp is lower than minimum image MPP of ' + str(min(self["mpps"])))
+            target_layer = self["mpps"].index(min(self["mpps"])) 
         else:
             target_layer = valid_layers[valid_diff_mpps.index(min(valid_diff_mpps))]
                 
@@ -199,13 +199,22 @@ class wsi(dict):
         
         return mask
         
+    def get_coords_scn(self,coords,target_layer):
+        coords = tuple([coords[0],self["img_dims"][target_layer][1] - coords[1]])
+        
+        return coords
+    
     def get_tile(self,desired_mpp,coords,wh,wh_at_base=False):        
         """Returns the RGB image of a tile. coords are at base MPP, wh is at desired_mpp unless wh_at_base=True, in which case wh is at base"""
         
         if wh_at_base:
             wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
+                            
         
         target_layer, _, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
+        
+        if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
+            coords = self.get_coords_scn(coords,target_layer)
         
         img = self.read_region(coords,target_layer,scaled_wh)
         img = np.array(img)
