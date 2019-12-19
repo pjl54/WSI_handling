@@ -3,13 +3,14 @@
 # coding: utf-8
 
 # %%
-
+import math
 
 import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 
 import matplotlib as mpl
+import matplotlib.path
 
 # import matplotlib.pyplot as plt
 # import time
@@ -42,11 +43,16 @@ class wsi(dict):
                 self["mpp"] = mpp
             else:
                 self["mpp"] = float(self["osh"].properties['openslide.mpp-x'])
-                
-            self["downsamples"] = self["osh"].level_downsamples
-            self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]            
             
+            
+            self["downsamples"] = self["osh"].level_downsamples
             self["img_dims"] = self["osh"].level_dimensions
+            
+            if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
+#                 self["offsets"] = (int(self["osh"].properties["openslide.bounds-x"])+int(self["osh"].properties["openslide.bounds-width"]),int(self["osh"].properties["openslide.bounds-y"])+int(self["osh"].properties["openslide.bounds-height"]))                
+                self["offsets"] = (int(self["osh"].properties["openslide.bounds-y"]) + int(self["osh"].properties["openslide.bounds-height"]),int(self["osh"].properties["openslide.bounds-x"]))
+                
+            self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]                                    
     
     def color_ref_match(self,colors_to_use):    
         """Given a string or list of strings corresponding to colors to use, returns the hexcodes of those colors"""
@@ -199,8 +205,9 @@ class wsi(dict):
         
         return mask
         
-    def get_coords_scn(self,coords,target_layer):
-        coords = tuple([coords[0],self["img_dims"][target_layer][1] - coords[1]])
+    def get_coords_scn(self,coords,scn_wh,target_layer):
+        
+        coords = (coords[1] + self["offsets"][1],-coords[0] + self["offsets"][0] - scn_wh[1])
         
         return coords
     
@@ -208,20 +215,32 @@ class wsi(dict):
         """Returns the RGB image of a tile. coords are at base MPP, wh is at desired_mpp unless wh_at_base=True, in which case wh is at base"""
         
         if wh_at_base:
+            scn_wh = (wh[1],wh[0])
             wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
-                            
-        
+                                    
         target_layer, _, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
         
         if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
-            coords = self.get_coords_scn(coords,target_layer)
+
+            # .scn images reads...backwards
+            if not wh_at_base:
+                scn_wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=self["mpp"],input_mpp=desired_mpp) for dimension in wh])
+            
+            scaled_wh = (scaled_wh[1],scaled_wh[0])
+            wh = (wh[1],wh[0])
+            coords = self.get_coords_scn(coords,scn_wh,target_layer)            
         
         img = self.read_region(coords,target_layer,scaled_wh)
         img = np.array(img)
         
 #         interp_method=cv2.INTER_CUIBC
+        
         img = cv2.resize(img,wh,interpolation=cv2.INTER_CUBIC)                
+        
+        if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
+            img = cv2.rotate(img,cv2.ROTATE_90_CLOCKWISE)
 
+            
         return img
     
     def get_wsi(self,desired_mpp):
@@ -248,7 +267,26 @@ class wsi(dict):
 
         return wsi_image
     
-    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True):
+    def get_dimensions_of_annotation(self,colors_to_use,annotation_idx):
+        points, _ = self.get_points(colors_to_use)
+        
+        if(not points):
+            print('No annotations of selected color')
+            bounding_box = None
+        else:
+        
+            poly_list = [Polygon(point_set) for point_set in points]
+
+
+            if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
+                areas = [poly.area for poly in poly_list]
+                annotation_idx = areas.index(max(areas))
+
+            bounding_box = poly_list[annotation_idx].bounds
+
+        return bounding_box
+    
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True):
         """Returns an RGB image of the specified annotated region."""
             
         points, _ = self.get_points(colors_to_use)
@@ -270,14 +308,28 @@ class wsi(dict):
 
             coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
             wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
-
-            img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
-            img = np.asarray(img)
+                             
+            if(tile_coords and tile_wh):
+                coords = tuple([coords[0]+tile_coords[0],coords[1]+tile_coords[1]])
+                
+                if(coords[0]+tile_wh[0] > bounding_box[2]):
+                    tile_wh[0] = bounding_box[2] - coords[0]
+                    
+                if(coords[1]+tile_wh[1] > bounding_box[3]):
+                    tile_wh[1] = bounding_box[3] - coords[1]
+                
+                wh = tile_wh
+            
+            if(return_img):
+                img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
+                img = np.asarray(img)
+            else:
+                img = None
 
             wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
             mask = self.mask_out_tile(desired_mpp,coords,wh,colors_to_use=colors_to_use)
                         
-            if(mask_out_roi):
+            if(mask_out_roi and return_img):
                 img = cv2.bitwise_and(img,img,mask=np.uint8(mask))
 
         return img, mask
