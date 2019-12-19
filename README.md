@@ -8,9 +8,9 @@ See wsi_demo.ipynb
 
 # TODO
 
-Add support for .scn images (OpenSlide reads .scn images in rotated by 270 degrees relative to how ImageScope reads them)
+~~Add support for .scn images (OpenSlide reads .scn images in rotated by 270 degrees relative to how ImageScope reads them)~~
 
-Add fuction to get tile of annotated region
+~~Add fuction to get tile of annotated region~~
 
 Add support for Bioformats
 
