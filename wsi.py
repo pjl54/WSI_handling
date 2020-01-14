@@ -95,7 +95,9 @@ class wsi(dict):
                     mapped_idx = len(color_map)
 
             if(mapped_idx):
-                mapped_idx = mapped_idx[0]
+                if(isinstance(mapped_idx,list)):
+                    mapped_idx = mapped_idx[0]
+                    
                 for regions in annotation.findall('Regions'):
                     for annCount, region in enumerate(regions.findall('Region')):                                
                         map_idx.append(mapped_idx)
