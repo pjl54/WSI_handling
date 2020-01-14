@@ -90,11 +90,11 @@ class wsi(dict):
             line_color = int(annotation.get('LineColor'))        
             mapped_idx = [item[1] for item in color_map if item[0] == line_color]
             
-            if(len(mapped_idx) is 0):
+            if(not mapped_idx):
                 if('other' in [item[2] for item in color_map]):
                     mapped_idx = len(color_map)
 
-            if(len(mapped_idx) is not 0):
+            if(mapped_idx):
                 mapped_idx = mapped_idx[0]
                 for regions in annotation.findall('Regions'):
                     for annCount, region in enumerate(regions.findall('Region')):                                
