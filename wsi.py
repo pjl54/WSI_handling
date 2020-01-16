@@ -106,7 +106,15 @@ class wsi(dict):
                             points.append([None] * len(vertices.findall('Vertex')))                    
                             for k, vertex in enumerate(vertices.findall('Vertex')):
                                 points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
-
+        
+        sort_order = [x[1] for x in color_map]
+        new_order = []
+        for x in sort_order:
+            new_order.extend([index for index, v in enumerate(map_idx) if v == x])
+        
+        points = [points[x] for x in new_order]
+        map_idx = [map_idx[x] for x in new_order]
+        
         return points, map_idx
         
     def get_coord_at_mpp(self,coordinate,output_mpp,input_mpp=None):
