@@ -76,6 +76,7 @@ class wsi(dict):
         """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
         
         color_map = self.color_ref_match(colors_to_use)    
+        full_map = self.color_ref_match(None)
 
         # create element tree object
         tree = ET.parse(self["xml_fname"])
@@ -90,9 +91,9 @@ class wsi(dict):
             line_color = int(annotation.get('LineColor'))        
             mapped_idx = [item[1] for item in color_map if item[0] == line_color]
             
-            if(not mapped_idx):
+            if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
                 if('other' in [item[2] for item in color_map]):
-                    mapped_idx = len(color_map)
+                    mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
 
             if(mapped_idx):
                 if(isinstance(mapped_idx,list)):
