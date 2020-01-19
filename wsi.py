@@ -77,9 +77,10 @@ class wsi(dict):
         """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
         color_map = self.color_ref_match(colors_to_use)    
         
+        color_key = ''.join([k[2] for k in color_map])
         # we can store the points for this combination to speed up getting it later
-        if ''.join([k[2] for k in color_map]) in self["stored_points"]:
-            return self["stored_points"][''.join([k[2] for k in color_map])]["points"], self["stored_points"][''.join([k[2] for k in color_map])]["map_idx"]
+        if color_key in self["stored_points"]:
+            return self["stored_points"][color_key]["points"].copy(), self["stored_points"][color_key]["map_idx"].copy()
         else:
             full_map = self.color_ref_match(None)
 
@@ -121,8 +122,8 @@ class wsi(dict):
             points = [points[x] for x in new_order]
             map_idx = [map_idx[x] for x in new_order]
             
-            self["stored_points"][''.join([k[2] for k in color_map])] = []
-            self["stored_points"][''.join([k[2] for k in color_map])] = {'points':points,'map_idx':map_idx}           
+            self["stored_points"][color_key] = []
+            self["stored_points"][color_key] = {'points':points,'map_idx':map_idx}           
 
             return points, map_idx
         
