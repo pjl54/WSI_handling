@@ -34,6 +34,7 @@ class wsi(dict):
     def __init__(self,img_fname=None,xml_fname=None, mpp=None):
         self["img_fname"] = img_fname
         self["xml_fname"] = xml_fname        
+        self["stored_points"] = dict()
         
         if img_fname is not None:
             self["osh"] = openslide.OpenSlide(img_fname)
@@ -75,48 +76,55 @@ class wsi(dict):
     def get_points(self,colors_to_use=None): 
         """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
         
-        color_map = self.color_ref_match(colors_to_use)    
-        full_map = self.color_ref_match(None)
+        # we can store the points for this combination to speed up getting it later
+        if ''.join(colors_to_use) in self["stored_points"]:
+            return self["stored_points"][''.join(colors_to_use)]["points"], self["stored_points"][''.join(colors_to_use)]["map_idx"]
+        else:
+            color_map = self.color_ref_match(colors_to_use)    
+            full_map = self.color_ref_match(None)
 
-        # create element tree object
-        tree = ET.parse(self["xml_fname"])
+            # create element tree object
+            tree = ET.parse(self["xml_fname"])
 
-        # get root element
-        root = tree.getroot()        
+            # get root element
+            root = tree.getroot()        
 
-        map_idx = []
-        points = []
+            map_idx = []
+            points = []
 
-        for annotation in root.findall('Annotation'):        
-            line_color = int(annotation.get('LineColor'))        
-            mapped_idx = [item[1] for item in color_map if item[0] == line_color]
+            for annotation in root.findall('Annotation'):        
+                line_color = int(annotation.get('LineColor'))        
+                mapped_idx = [item[1] for item in color_map if item[0] == line_color]
+
+                if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
+                    if('other' in [item[2] for item in color_map]):
+                        mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
+
+                if(mapped_idx):
+                    if(isinstance(mapped_idx,list)):
+                        mapped_idx = mapped_idx[0]
+
+                    for regions in annotation.findall('Regions'):
+                        for annCount, region in enumerate(regions.findall('Region')):                                
+                            map_idx.append(mapped_idx)
+
+                            for vertices in region.findall('Vertices'):
+                                points.append([None] * len(vertices.findall('Vertex')))                    
+                                for k, vertex in enumerate(vertices.findall('Vertex')):
+                                    points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
+
+            sort_order = [x[1] for x in color_map]
+            new_order = []
+            for x in sort_order:
+                new_order.extend([index for index, v in enumerate(map_idx) if v == x])
+
+            points = [points[x] for x in new_order]
+            map_idx = [map_idx[x] for x in new_order]
             
-            if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
-                if('other' in [item[2] for item in color_map]):
-                    mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
+            self["stored_points"][''.join(colors_to_use)] = []
+            self["stored_points"][''.join(colors_to_use)] = {'points':points,'map_idx':map_idx}           
 
-            if(mapped_idx):
-                if(isinstance(mapped_idx,list)):
-                    mapped_idx = mapped_idx[0]
-                    
-                for regions in annotation.findall('Regions'):
-                    for annCount, region in enumerate(regions.findall('Region')):                                
-                        map_idx.append(mapped_idx)
-
-                        for vertices in region.findall('Vertices'):
-                            points.append([None] * len(vertices.findall('Vertex')))                    
-                            for k, vertex in enumerate(vertices.findall('Vertex')):
-                                points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
-        
-        sort_order = [x[1] for x in color_map]
-        new_order = []
-        for x in sort_order:
-            new_order.extend([index for index, v in enumerate(map_idx) if v == x])
-        
-        points = [points[x] for x in new_order]
-        map_idx = [map_idx[x] for x in new_order]
-        
-        return points, map_idx
+            return points, map_idx
         
     def get_coord_at_mpp(self,coordinate,output_mpp,input_mpp=None):
         """Given a dimension or coordinate, returns what that input would be scaled to the given MPP"""
