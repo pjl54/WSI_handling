@@ -75,12 +75,12 @@ class wsi(dict):
     
     def get_points(self,colors_to_use=None): 
         """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
+        color_map = self.color_ref_match(colors_to_use)    
         
         # we can store the points for this combination to speed up getting it later
-        if ''.join(colors_to_use) in self["stored_points"]:
-            return self["stored_points"][''.join(colors_to_use)]["points"], self["stored_points"][''.join(colors_to_use)]["map_idx"]
+        if ''.join([k[2] for k in color_map]) in self["stored_points"]:
+            return self["stored_points"][''.join([k[2] for k in color_map])]["points"], self["stored_points"][''.join([k[2] for k in color_map])]["map_idx"]
         else:
-            color_map = self.color_ref_match(colors_to_use)    
             full_map = self.color_ref_match(None)
 
             # create element tree object
@@ -121,8 +121,8 @@ class wsi(dict):
             points = [points[x] for x in new_order]
             map_idx = [map_idx[x] for x in new_order]
             
-            self["stored_points"][''.join(colors_to_use)] = []
-            self["stored_points"][''.join(colors_to_use)] = {'points':points,'map_idx':map_idx}           
+            self["stored_points"][''.join([k[2] for k in color_map])] = []
+            self["stored_points"][''.join([k[2] for k in color_map])] = {'points':points,'map_idx':map_idx}           
 
             return points, map_idx
         
