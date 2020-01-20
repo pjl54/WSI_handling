@@ -123,7 +123,7 @@ class wsi(dict):
             map_idx = [map_idx[x] for x in new_order]
             
             self["stored_points"][color_key] = []
-            self["stored_points"][color_key] = {'points':points,'map_idx':map_idx}           
+            self["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
 
             return points, map_idx
         
@@ -164,6 +164,14 @@ class wsi(dict):
         
         return img        
 
+    def resize_points(self,points,resize_factor):
+        
+        for k, pointSet in enumerate(points):
+            points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
+        
+        return points
+                      
+                      
     def mask_out_annotation(self,desired_mpp=None,colors_to_use=None):        
         """Returns the mask of annotations. Annotations to be returned specified in colors_to_use. Which annotations are on top controlled by order of strings in colors_to_use"""
     
@@ -174,16 +182,14 @@ class wsi(dict):
         else:
             resize_factor = 1
 
-        for k, pointSet in enumerate(points):
-            points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
-
+        points = self.resize_points(points,resize_factor)
+        
         mask = np.zeros((int(self["img_dims"][0][1] * resize_factor), int(self["img_dims"][0][0] * resize_factor)),dtype=np.uint8)
 
         for annCount, pointSet in enumerate(points):                    
             cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
             
-        return mask, resize_factor
-
+        return mask, resize_factor        
     
     def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None):
         """Returns the mask of a tile"""
@@ -196,8 +202,7 @@ class wsi(dict):
             resize_factor = 1
 
         # this rounding may de-align the mask and RGB image
-        for k, pointSet in enumerate(points):
-            points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
+        points = self.resize_points(points,resize_factor)
 
         coords = tuple([int(c * resize_factor) for c in coords])
 
