@@ -210,7 +210,7 @@ class wsi(dict):
             areas = [poly.area for poly in poly_list]
             annotation_idx = areas.index(max(areas))
             points = points[annotation_idx]
-        else if annotation_idx:
+        elif annotation_idx:
             points = points[annotation_idx]
 
 
