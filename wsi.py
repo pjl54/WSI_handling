@@ -126,6 +126,13 @@ class wsi(dict):
             self["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
 
             return points, map_idx
+    
+    def get_largest_region(self,points):                
+        
+        poly_list = [Polygon(point_set) for point_set in points]            
+        areas = [poly.area for poly in poly_list]            
+        
+        return areas.index(max(areas))
         
     def get_coord_at_mpp(self,coordinate,output_mpp,input_mpp=None):
         """Given a dimension or coordinate, returns what that input would be scaled to the given MPP"""
@@ -204,14 +211,11 @@ class wsi(dict):
         # this rounding may de-align the mask and RGB image
         points = self.resize_points(points,resize_factor)
                 
-                            
         if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
-            poly_list = [Polygon(point_set) for point_set in points]            
-            areas = [poly.area for poly in poly_list]
-            annotation_idx = areas.index(max(areas))
-            points = points[annotation_idx]
-        elif annotation_idx:
-            points = points[annotation_idx]
+            largest_idx = self.get_largest_region(points)
+            points = [points[largest_idx]]
+        elif annotation_idx is not None:
+            points = [points[annotation_idx]]
 
 
         coords = tuple([int(c * resize_factor) for c in coords])
@@ -220,7 +224,6 @@ class wsi(dict):
 
         new_points = []
         for k, point_set in enumerate(points):                
-
             if(all(mpl.path.Path(np.array(point_set)).contains_points(polygon))):
                 new_points.append(polygon)
 
