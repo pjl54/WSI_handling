@@ -169,7 +169,7 @@ class wsi(dict):
         for k, pointSet in enumerate(points):
             points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
         
-        return points
+        return points.copy()
                       
                       
     def mask_out_annotation(self,desired_mpp=None,colors_to_use=None):        
@@ -202,7 +202,7 @@ class wsi(dict):
             resize_factor = 1
 
         # this rounding may de-align the mask and RGB image
-        points,_ = self.resize_points(points,resize_factor)
+        points = self.resize_points(points,resize_factor)
                 
                             
         if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
