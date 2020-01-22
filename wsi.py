@@ -202,7 +202,7 @@ class wsi(dict):
             resize_factor = 1
 
         # this rounding may de-align the mask and RGB image
-        points = self.resize_points(points,resize_factor)
+        points,_ = self.resize_points(points,resize_factor)
                 
                             
         if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
