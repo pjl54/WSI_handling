@@ -191,7 +191,7 @@ class wsi(dict):
             
         return mask, resize_factor        
     
-    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None):
+    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None):
         """Returns the mask of a tile"""
     
         points, map_idx = self.get_points(colors_to_use)
@@ -203,6 +203,16 @@ class wsi(dict):
 
         # this rounding may de-align the mask and RGB image
         points = self.resize_points(points,resize_factor)
+                
+                            
+        if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
+            poly_list = [Polygon(point_set) for point_set in points]            
+            areas = [poly.area for poly in poly_list]
+            annotation_idx = areas.index(max(areas))
+            points = points[annotation_idx]
+        else if annotation_idx:
+            points = points[annotation_idx]
+
 
         coords = tuple([int(c * resize_factor) for c in coords])
 
