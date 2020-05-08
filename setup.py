@@ -6,7 +6,7 @@ setup(
   license='MIT',        
   description = 'Convienent handling of annotated whole slide images',   
   author = 'Patrick Leo',                   
-  author_email = '',      
+  author_email = 'pjl54@case.edu',      
   url = 'https://github.com/pjl54/WSI_handling/tree/pip_ready',   
   download_url = 'https://github.com/pjl54/WSI_handling/archive/v_01.tar.gz',
   keywords = ['whole slide image', 'digital pathology', 'annotations'],
@@ -14,7 +14,7 @@ setup(
           'xml',
           'numpy',
 		  'matplotlib',
-		  'PIL',
+		  'Pillow',
 		  'opencv-python',
 		  'shapely',
 		  'openslide-python'
