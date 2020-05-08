@@ -8,10 +8,9 @@ setup(
   author = 'Patrick Leo',                   
   author_email = 'pjl54@case.edu',      
   url = 'https://github.com/pjl54/WSI_handling/tree/pip_ready',   
-  download_url = 'https://github.com/pjl54/WSI_handling/archive/v0.2.tar.gz',
+  download_url = 'https://github.com/pjl54/WSI_handling/archive/v0.3.tar.gz',
   keywords = ['whole slide image', 'digital pathology', 'annotations'],
   install_requires=[
-          'xml',
           'numpy',
 		  'matplotlib',
 		  'Pillow',
