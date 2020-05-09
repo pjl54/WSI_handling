@@ -3,23 +3,14 @@
 # coding: utf-8
 
 # %%
-import math
-
 import xml.etree.ElementTree as ET
 import numpy as np
-import cv2
 
 import matplotlib as mpl
 import matplotlib.path
 
-# import matplotlib.pyplot as plt
-# import time
-# import tqdm
-
 import PIL
 from PIL import Image,ImageDraw
-import operator
-
 import cv2
 
 from shapely.geometry import Polygon
