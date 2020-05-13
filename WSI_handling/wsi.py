@@ -43,8 +43,9 @@ class wsi(dict):
             self["img_dims"] = self["osh"].level_dimensions
             
             if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
-#                 self["offsets"] = (int(self["osh"].properties["openslide.bounds-x"])+int(self["osh"].properties["openslide.bounds-width"]),int(self["osh"].properties["openslide.bounds-y"])+int(self["osh"].properties["openslide.bounds-height"]))                
                 self["offsets"] = (int(self["osh"].properties["openslide.bounds-y"]) + int(self["osh"].properties["openslide.bounds-height"]),int(self["osh"].properties["openslide.bounds-x"]))
+                real_dims = (int(self["osh"].properties['openslide.bounds-height']), int(self["osh"].properties['openslide.bounds-width']))
+                self['img_dims'] = [(int(real_dims[0]/down),int(real_dims[1]/down)) for down in self['downsamples']]
                 
             self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]                                    
     
@@ -225,7 +226,6 @@ class wsi(dict):
 
                 new_points.append(region_point_set)
 
-#         mask = Image.new('L', (wh[0], wh[1]), 0)
         mask = np.zeros((wh[1],wh[0]),dtype=np.uint8)
 
         for k, pointSet in enumerate(points):
@@ -292,9 +292,6 @@ class wsi(dict):
         wsi_image = self.get_wsi(wsi_mpp).copy()        
 
         cv2.rectangle(wsi_image,rect_coords,tuple(map(lambda x,y: x+y,rect_coords,wsi_scaled_wh)),(0,255,0),int(np.max(np.shape(wsi_image))/200))
-#         tile_rect = ImageDraw.Draw(wsi_image)
-#         outer_point = tuple(map(operator.add,rect_coords,wsi_scaled_wh))        
-#         tile_rect.rectangle((rect_coords,outer_point),outline="#000000",width=40)
 
         return wsi_image
     
