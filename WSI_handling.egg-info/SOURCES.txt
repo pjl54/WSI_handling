@@ -1,0 +1,10 @@
+README.md
+setup.cfg
+setup.py
+WSI_handling/__init__.py
+WSI_handling/wsi.py
+WSI_handling.egg-info/PKG-INFO
+WSI_handling.egg-info/SOURCES.txt
+WSI_handling.egg-info/dependency_links.txt
+WSI_handling.egg-info/requires.txt
+WSI_handling.egg-info/top_level.txt

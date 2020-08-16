@@ -4,7 +4,6 @@
 
 # %%
 
-import xml.etree.ElementTree as ET
 import numpy as np
 
 import matplotlib as mpl
@@ -18,15 +17,19 @@ import cv2
 from shapely.geometry import Polygon
 import openslide
 
+from pathlib import Path
+
+from .annotation_handlers import get_points_xml
+from .annotation_handlers import get_points_json
 
 # %%
 
 
 class wsi(dict):
     
-    def __init__(self,img_fname=None,xml_fname=None, mpp=None):
+    def __init__(self,img_fname=None,annotation_fname=None, mpp=None, img_dims=None):
         self["img_fname"] = img_fname
-        self["xml_fname"] = xml_fname        
+        self["annotation_fname"] = annotation_fname        
         self["stored_points"] = dict()
         
         if img_fname is not None:
@@ -47,79 +50,24 @@ class wsi(dict):
                 real_dims = (int(self["osh"].properties['openslide.bounds-height']), int(self["osh"].properties['openslide.bounds-width']))
                 self['img_dims'] = [(int(real_dims[0]/down),int(real_dims[1]/down)) for down in self['downsamples']]
                 
-            self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]                                    
-    
-    def color_ref_match(self,colors_to_use):    
-        """Given a string or list of strings corresponding to colors to use, returns the hexcodes of those colors"""
-                
-        color_ref = [(65535,1,'yellow'),(65280,2,'green'),(255,3,'red'),(16711680,4,'blue'),(16711808,5,'purple'),(np.nan,6,'other')]    
-        
-        if colors_to_use is not None:
+            self["mpps"] = [ds*self["mpp"] for ds in self["downsamples"]]   
             
-            if isinstance(colors_to_use,str):
-                colors_to_use = colors_to_use.lower()
-            else:
-                colors_to_use = [color.lower() for color in colors_to_use]
-
-            color_map = [c for c in color_ref if c[2] in colors_to_use]
+        # if you don't have an image, such as just making binary masks from annotations
         else:
-            color_map = color_ref        
-
-        return color_map
-    
-    def get_points(self,colors_to_use=None): 
-        """Given a set of annotation colors, parses the xml file to get those annotations as lists of verticies"""
-        color_map = self.color_ref_match(colors_to_use)    
+            if mpp is not None:
+                self["mpp"] = mpp
+            if img_dims is not None:
+                self["img_dims"] = [img_dims]   
         
-        color_key = ''.join([k[2] for k in color_map])
-        # we can store the points for this combination to speed up getting it later
-        if color_key in self["stored_points"]:
-            return self["stored_points"][color_key]["points"].copy(), self["stored_points"][color_key]["map_idx"].copy()
-        else:
-            full_map = self.color_ref_match(None)
-
-            # create element tree object
-            tree = ET.parse(self["xml_fname"])
-
-            # get root element
-            root = tree.getroot()        
-
-            map_idx = []
-            points = []
-
-            for annotation in root.findall('Annotation'):        
-                line_color = int(annotation.get('LineColor'))        
-                mapped_idx = [item[1] for item in color_map if item[0] == line_color]
-
-                if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
-                    if('other' in [item[2] for item in color_map]):
-                        mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
-
-                if(mapped_idx):
-                    if(isinstance(mapped_idx,list)):
-                        mapped_idx = mapped_idx[0]
-
-                    for regions in annotation.findall('Regions'):
-                        for annCount, region in enumerate(regions.findall('Region')):                                
-                            map_idx.append(mapped_idx)
-
-                            for vertices in region.findall('Vertices'):
-                                points.append([None] * len(vertices.findall('Vertex')))                    
-                                for k, vertex in enumerate(vertices.findall('Vertex')):
-                                    points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
-
-            sort_order = [x[1] for x in color_map]
-            new_order = []
-            for x in sort_order:
-                new_order.extend([index for index, v in enumerate(map_idx) if v == x])
-
-            points = [points[x] for x in new_order]
-            map_idx = [map_idx[x] for x in new_order]
+    def get_points(self,colors_to_use,custom_colors):        
+        
+        if Path(self['annotation_fname']).suffix == '.xml':
+            points, map_idx = get_points_xml(self,colors_to_use,custom_colors)
             
-            self["stored_points"][color_key] = []
-            self["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
-
-            return points, map_idx
+        if Path(self['annotation_fname']).suffix == '.json':
+            points, map_idx = get_points_json(self,colors_to_use)
+            
+        return points, map_idx
     
     def get_largest_region(self,points):                
         
@@ -171,36 +119,13 @@ class wsi(dict):
             points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
         
         return points.copy()
-                      
-                      
-    def mask_out_annotation(self,desired_mpp=None,colors_to_use=None):        
-        """Returns the mask of annotations. Annotations to be returned specified in colors_to_use. Which annotations are on top controlled by order of strings in colors_to_use"""
-    
-        points, map_idx = self.get_points(colors_to_use)
-
-        if self["img_fname"] is not None:
-            resize_factor = self["mpp"] / desired_mpp                
-        else:
-            resize_factor = 1
-
-        points = self.resize_points(points,resize_factor)
-        
-        mask = np.zeros((int(self["img_dims"][0][1] * resize_factor), int(self["img_dims"][0][0] * resize_factor)),dtype=np.uint8)
-
-        for annCount, pointSet in enumerate(points):                    
-            cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
-            
-        return mask, resize_factor        
-    
-    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None):
+                                                
+    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[]):
         """Returns the mask of a tile"""
     
-        points, map_idx = self.get_points(colors_to_use)
+        points, map_idx = self.get_points(colors_to_use,custom_colors)
 
-        if self["img_fname"] is not None:
-            resize_factor = self["mpp"] / desired_mpp                
-        else:
-            resize_factor = 1
+        resize_factor = self["mpp"] / desired_mpp                
 
         # this rounding may de-align the mask and RGB image
         points = self.resize_points(points,resize_factor)
@@ -235,6 +160,16 @@ class wsi(dict):
             cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
         
         return mask
+
+    def mask_out_annotation(self,desired_mpp=None,colors_to_use=None,custom_colors=[]):        
+        """Returns the mask of annotations. Annotations to be returned specified in colors_to_use. Which annotations are on top controlled by order of strings in colors_to_use"""
+        
+        if desired_mpp is None:
+            desired_mpp = self['mpp']
+        
+        wh = [self.get_coord_at_mpp(c,output_mpp=desired_mpp,input_mpp=self['mpp']) for c in [self['img_dims'][0][0],self['img_dims'][0][1]]]
+        
+        return self.mask_out_tile(desired_mpp,(0,0),wh,colors_to_use,None,custom_colors)        
         
     def get_coords_scn(self,coords,scn_wh,target_layer):
         
@@ -295,8 +230,8 @@ class wsi(dict):
 
         return wsi_image
     
-    def get_dimensions_of_annotation(self,colors_to_use,annotation_idx):
-        points, _ = self.get_points(colors_to_use)
+    def get_dimensions_of_annotation(self,colors_to_use,annotation_idx,custom_colors=[]):
+        points, _ = self.get_points(colors_to_use,custom_colors)
         
         if(not points):
             print('No annotations of selected color')
@@ -314,10 +249,10 @@ class wsi(dict):
 
         return bounding_box
     
-    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True):
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True,custom_colors=[]):
         """Returns an RGB image of the specified annotated region."""
             
-        points, _ = self.get_points(colors_to_use)
+        points, _ = self.get_points(colors_to_use,custom_colors)
         
         if(not points):
             print('No annotations of selected color')

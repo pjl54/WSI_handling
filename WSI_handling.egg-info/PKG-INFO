@@ -1,0 +1,53 @@
+Metadata-Version: 2.1
+Name: WSI-handling
+Version: 0.13
+Summary: Convienent handling of annotated whole slide images
+Home-page: https://github.com/pjl54/WSI_handling/tree/pip_ready
+Author: Patrick Leo
+Author-email: pjl54@case.edu
+License: MIT
+Download-URL: https://github.com/pjl54/WSI_handling/archive/v0.13.tar.gz
+Description: # WSI_handling
+        Code snippets for handling digital pathology pyramidal whole slide images (WSIs). Currently only works with annotation XMLs from Aperio ImageScope and image formats supported by Openslide.
+        
+        Supports getting a tile from a WSI at the desired micron-per-pixel (mpp), getting either the whole WSI or an annotated region, generating a mask image for either a tile or the WSIs, and showing the location of a tile on the WSI.
+        
+        # Annotation format
+        Annotations must follow the AperioImagescope format
+        
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Annotations>
+        <Annotation LineColor="65280">
+        <Regions>
+        <Region>
+        <Vertices>
+        <Vertex X="56657.4765625" Y="78147.3984375"/>
+        <Vertex X="56657.4765625" Y="78147.3984375"/>
+        <Vertex X="56664.46875" Y="78147.3984375"/>
+        </Region>
+        </Regions>
+        </Annotation>
+        </Annotations>
+        
+        With more <Annotation> or <Region> blocks for additional annotations.
+        
+        # Usage
+        from WSI_handling import wsi
+        
+        xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
+        img_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.svs'
+        w = wsi(img_fname,xml_fname)
+        
+        wsi_img = w.get_wsi(desired_mpp=4));
+        ROI, mask = w.get_annotated_region(desired_mpp=2,colors_to_use='green',annotation_idx='largest',mask_out_roi=False)
+        tile = w.get_tile(desired_mpp=1,coords=(10000,25000),wh=(2000,2000))
+        tile_mask = w.mask_out_tile(desired_mpp=1,coords=(10000,25000),wh=(2000,2000)))
+        tile_location = w.show_tile_location(desired_mpp=1,coords=(10000,25000),wh=(2000,2000))
+        
+Keywords: whole slide image,digital pathology,annotations
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.6
+Description-Content-Type: text/markdown
