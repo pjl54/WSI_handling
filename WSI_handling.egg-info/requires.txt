@@ -1,6 +1,0 @@
-Pillow
-matplotlib
-numpy
-opencv-python
-openslide-python
-shapely
