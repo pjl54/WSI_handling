@@ -93,6 +93,11 @@ def get_points_json(wsi_object,colors_to_use):
             points = []
             for idx,color in enumerate(colors_to_use):
                 for anno in json_anno:
+                    
+                    if 'classification' not in anno['properties']:
+                        anno['properties']['classification'] = dict()
+                    if 'name' not in anno['properties']['classification']:
+                        anno['properties']['classification']['name'] = 'null'
 
                     if anno['properties']['classification']['name'].lower() == color:
 
@@ -103,17 +108,18 @@ def get_points_json(wsi_object,colors_to_use):
                             for roi in coordinates:
                                 for sub_roi in roi:
                                     points.append([(coord[0], coord[1]) for coord in sub_roi])
+                                    map_idx.append(mapper[idx])
                         elif geom_type == 'Polygon':
                             for coords in coordinates:
                                 points.append([(coord[0], coord[1]) for coord in coords])
+                                map_idx.append(mapper[idx])
                         elif geom_type == 'LineString':            
-                            points.append([(coord[0], coord[1]) for coord in coords])
-
-                        map_idx.append(mapper[k])
+                            points.append([(coord[0], coord[1]) for coord in coords])                        
+                            map_idx.append(mapper[idx])
 
 
             wsi_object["stored_points"][color_key] = []
             wsi_object["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
 
-        return point_sets, map_idx
+        return points, map_idx
 
