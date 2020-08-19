@@ -8,7 +8,7 @@ with open(path.join(this_directory, 'README.md')) as f:
 setup(
   name = 'WSI_handling',         
   packages = ['WSI_handling'],   
-  version = '0.13',
+  version = '0.14',
   license='MIT',        
   description = 'Convienent handling of annotated whole slide images',
   long_description=long_description,

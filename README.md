@@ -1,10 +1,10 @@
 # WSI_handling
-Code snippets for handling digital pathology pyramidal whole slide images (WSIs). Currently only works with annotation XMLs from Aperio ImageScope and image formats supported by Openslide.
+Code for handling digital pathology pyramidal whole slide images (WSIs). Currently works with annotation XMLs from Aperio ImageScope or annotation json's from QuPath and image formats supported by Openslide.
 
 Supports getting a tile from a WSI at the desired micron-per-pixel (mpp), getting either the whole WSI or an annotated region, generating a mask image for either a tile or the WSIs, and showing the location of a tile on the WSI.
 
 # Annotation format
-Annotations must follow the AperioImagescope format
+XML annotations must follow the AperioImagescope format
 
 <?xml version="1.0" encoding="UTF-8"?>
 <Annotations>
@@ -22,15 +22,11 @@ Annotations must follow the AperioImagescope format
 
 With more <Annotation> or <Region> blocks for additional annotations.
 
+json annotations must follow QuPath's json export format.
+
+# Installation
+
+pip install WSI_handling
+
 # Usage
-from WSI_handling import wsi
-
-xml_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.xml'
-img_fname=r'/mnt/data/home/pjl54/UPenn_prostate/20698.svs'
-w = wsi(img_fname,xml_fname)
-
-wsi_img = w.get_wsi(desired_mpp=4));
-ROI, mask = w.get_annotated_region(desired_mpp=2,colors_to_use='green',annotation_idx='largest',mask_out_roi=False)
-tile = w.get_tile(desired_mpp=1,coords=(10000,25000),wh=(2000,2000))
-tile_mask = w.mask_out_tile(desired_mpp=1,coords=(10000,25000),wh=(2000,2000)))
-tile_location = w.show_tile_location(desired_mpp=1,coords=(10000,25000),wh=(2000,2000))
+See https://github.com/pjl54/WSI_handling/blob/master/wsi_demo.ipynb
