@@ -120,10 +120,14 @@ class wsi(dict):
         
         return points.copy()
                                                 
-    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[]):
+    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None):
         """Returns the mask of a tile"""
     
-        points, map_idx = self.get_points(colors_to_use,custom_colors)
+        if point_dict:
+            points = point_dict['points']
+            map_idx = point_dict['map_idx']
+        else:
+            points, map_idx = self.get_points(colors_to_use,custom_colors)            
 
         resize_factor = self["mpp"] / desired_mpp                
 
@@ -252,7 +256,7 @@ class wsi(dict):
     def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True,custom_colors=[]):
         """Returns an RGB image of the specified annotated region."""
             
-        points, _ = self.get_points(colors_to_use,custom_colors)
+        points, map_idx = self.get_points(colors_to_use,custom_colors)
         
         if(not points):
             print('No annotations of selected color')
@@ -267,6 +271,10 @@ class wsi(dict):
                 areas = [poly.area for poly in poly_list]
                 annotation_idx = areas.index(max(areas))
 
+            point_dict = dict()
+            point_dict['points'] = [points[annotation_idx]]
+            point_dict['map_idx'] = [map_idx[annotation_idx]]
+            
             bounding_box = poly_list[annotation_idx].bounds
 
             coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
@@ -290,7 +298,7 @@ class wsi(dict):
                 img = None
 
             wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
-            mask = self.mask_out_tile(desired_mpp,coords,wh,colors_to_use=colors_to_use)
+            mask = self.mask_out_tile(desired_mpp,coords,wh,colors_to_use=colors_to_use,point_dict=point_dict)
                         
             if(mask_out_roi and return_img):
                 img = cv2.bitwise_and(img,img,mask=np.uint8(mask))
