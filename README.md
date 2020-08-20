@@ -6,7 +6,7 @@ Supports getting a tile from a WSI at the desired micron-per-pixel (mpp), gettin
 # Annotation format
 XML annotations must follow the AperioImagescope format
 
-<?xml version="1.0" encoding="UTF-8"?>
+''''<?xml version="1.0" encoding="UTF-8"?>
 <Annotations>
 <Annotation LineColor="65280">
 <Regions>
@@ -19,8 +19,9 @@ XML annotations must follow the AperioImagescope format
 </Regions>
 </Annotation>
 </Annotations>
+''''
 
-With more <Annotation> or <Region> blocks for additional annotations.
+With more \<Annotation\> or \<Region\> blocks for additional annotations.
 
 json annotations must follow QuPath's json export format.
 
