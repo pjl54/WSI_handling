@@ -28,7 +28,7 @@ With more \<Annotation\> or \<Region\> blocks for additional annotations.
 
 json annotations must follow QuPath's json export format:
 
-```json
+```
 [
   {
     "type": "Feature",
@@ -52,7 +52,6 @@ json annotations must follow QuPath's json export format:
       "isLocked": true,
       "measurements": []
     }
-  {
 ]
 ```
 
