@@ -3,6 +3,7 @@
 # coding: utf-8
 
 # %%
+import warnings
 
 import numpy as np
 
@@ -94,7 +95,7 @@ class wsi(dict):
         valid_diff_mpps = [v[1] for v in valid_layers]
         valid_layers= [v[0] for v in valid_layers]
         if len(valid_layers) == 0:
-            print('Warning: desired_mpp is lower than minimum image MPP of ' + str(min(self["mpps"])))
+            warnings.warn('Warning: desired_mpp is lower than minimum image MPP of ' + str(min(self["mpps"])))
             target_layer = self["mpps"].index(min(self["mpps"])) 
         else:
             target_layer = valid_layers[valid_diff_mpps.index(min(valid_diff_mpps))]
@@ -120,8 +121,11 @@ class wsi(dict):
         
         return points.copy()
                                                 
-    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None):
+    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None,wh_at_base=False):
         """Returns the mask of a tile"""
+    
+        if wh_at_base:        
+            wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
     
         if point_dict:
             points = point_dict['points']
@@ -175,7 +179,7 @@ class wsi(dict):
         
         return self.mask_out_tile(desired_mpp,(0,0),wh,colors_to_use,None,custom_colors)        
         
-    def get_coords_scn(self,coords,scn_wh,target_layer):
+    def get_coords_scn(self,coords,scn_wh):
         
         coords = (coords[1] + self["offsets"][1],-coords[0] + self["offsets"][0] - scn_wh[1])
         
@@ -190,15 +194,16 @@ class wsi(dict):
                                     
         target_layer, _, scaled_wh = self.get_layer_for_mpp(desired_mpp,wh)
         
-        if(len(self["img_fname"]) >= 3 and self["img_fname"][-3:] == 'scn'):
+        if(Path(self["img_fname"]).suffix == '.scn'):
 
             # .scn images reads...backwards
+            scaled_wh = (scaled_wh[1],scaled_wh[0])
+            wh = (wh[1],wh[0])
+
             if not wh_at_base:
                 scn_wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=self["mpp"],input_mpp=desired_mpp) for dimension in wh])
             
-            scaled_wh = (scaled_wh[1],scaled_wh[0])
-            wh = (wh[1],wh[0])
-            coords = self.get_coords_scn(coords,scn_wh,target_layer)            
+            coords = self.get_coords_scn(coords,scn_wh)            
         
         img = self.read_region(coords,target_layer,scaled_wh)
         img = np.array(img)
@@ -249,7 +254,7 @@ class wsi(dict):
                 areas = [poly.area for poly in poly_list]
                 annotation_idx = areas.index(max(areas))
 
-            bounding_box = poly_list[annotation_idx].bounds
+            bounding_box = [int(c) for c in poly_list[annotation_idx].bounds]
 
         return bounding_box
     
