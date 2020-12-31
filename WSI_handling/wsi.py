@@ -3,7 +3,10 @@
 # coding: utf-8
 
 # %%
+<<<<<<< HEAD:WSI_handling/wsi.py
 import warnings
+=======
+>>>>>>> master:wsi.py
 
 import numpy as np
 
@@ -121,12 +124,18 @@ class wsi(dict):
         
         return points.copy()
                                                 
+<<<<<<< HEAD:WSI_handling/wsi.py
     def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None,wh_at_base=False):
         """Returns the mask of a tile"""
     
         if wh_at_base:        
             wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
     
+=======
+    def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None):
+        """Returns the mask of a tile"""
+    
+>>>>>>> master:wsi.py
         if point_dict:
             points = point_dict['points']
             map_idx = point_dict['map_idx']
@@ -176,6 +185,11 @@ class wsi(dict):
             desired_mpp = self['mpp']
         
         wh = [self.get_coord_at_mpp(c,output_mpp=desired_mpp,input_mpp=self['mpp']) for c in [self['img_dims'][0][0],self['img_dims'][0][1]]]
+<<<<<<< HEAD:WSI_handling/wsi.py
+=======
+        
+        return self.mask_out_tile(desired_mpp,(0,0),wh,colors_to_use,None,custom_colors)        
+>>>>>>> master:wsi.py
         
         return self.mask_out_tile(desired_mpp,(0,0),wh,colors_to_use,None,custom_colors)        
         
