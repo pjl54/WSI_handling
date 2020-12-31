@@ -95,7 +95,8 @@ class wsi(dict):
         valid_diff_mpps = [v[1] for v in valid_layers]
         valid_layers= [v[0] for v in valid_layers]
         if len(valid_layers) == 0:
-            warnings.warn('Warning: desired_mpp is lower than minimum image MPP of ' + str(min(self["mpps"])))
+            warn_message = 'Desired_mpp is lower than minimum image MPP of ' + str(min(self["mpps"]))
+            warnings.warn(warn_message)
             target_layer = self["mpps"].index(min(self["mpps"])) 
         else:
             target_layer = valid_layers[valid_diff_mpps.index(min(valid_diff_mpps))]
@@ -258,7 +259,7 @@ class wsi(dict):
 
         return bounding_box
     
-    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True,custom_colors=[]):
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True,custom_colors=[],restrict_to_anno=True):
         """Returns an RGB image of the specified annotated region."""
             
         points, map_idx = self.get_points(colors_to_use,custom_colors)
@@ -288,12 +289,13 @@ class wsi(dict):
             if(tile_coords and tile_wh):
                 coords = tuple([coords[0]+tile_coords[0],coords[1]+tile_coords[1]])
                 
-                if(coords[0]+tile_wh[0] > bounding_box[2]):
-                    tile_wh[0] = bounding_box[2] - coords[0]
-                    
-                if(coords[1]+tile_wh[1] > bounding_box[3]):
-                    tile_wh[1] = bounding_box[3] - coords[1]
-                
+                if(restrict_to_anno):
+                    if(coords[0]+tile_wh[0] > bounding_box[2]):
+                        tile_wh[0] = bounding_box[2] - coords[0]
+
+                    if(coords[1]+tile_wh[1] > bounding_box[3]):
+                        tile_wh[1] = bounding_box[3] - coords[1]
+
                 wh = tile_wh
             
             if(return_img):

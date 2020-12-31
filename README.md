@@ -139,15 +139,8 @@ plt.imshow(mask);
 
 
 ```python
-plt.imshow(w.get_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)))
+plt.imshow(w.get_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)));
 ```
-
-
-
-
-    <matplotlib.image.AxesImage at 0x7f95cdbe4668>
-
-
 
 
     
@@ -157,15 +150,8 @@ plt.imshow(w.get_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)))
 
 
 ```python
-plt.imshow(w.mask_out_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)))
+plt.imshow(w.mask_out_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)));
 ```
-
-
-
-
-    <matplotlib.image.AxesImage at 0x7f95cdbf9ac8>
-
-
 
 
     
@@ -175,15 +161,8 @@ plt.imshow(w.mask_out_tile(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)))
 
 
 ```python
-plt.imshow(w.show_tile_location(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)))
+plt.imshow(w.show_tile_location(desired_mpp=1,coords=(3400,54000),wh=(2000,2000)));
 ```
-
-
-
-
-    <matplotlib.image.AxesImage at 0x7f95cec802b0>
-
-
 
 
     
