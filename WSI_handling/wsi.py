@@ -259,7 +259,7 @@ class wsi(dict):
 
         return bounding_box
     
-    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,return_img=True,custom_colors=[],restrict_to_anno=True):
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,wh_add=(0,0),return_img=True,custom_colors=[],restrict_to_anno=True):
         """Returns an RGB image of the specified annotated region."""
             
         points, map_idx = self.get_points(colors_to_use,custom_colors)
@@ -298,6 +298,8 @@ class wsi(dict):
 
                 wh = tile_wh
             
+            wh = [wh[k]+wh_add[k] for k in [0,1]]
+                        
             if(return_img):
                 img = self.get_tile(desired_mpp,coords,wh,wh_at_base=True)
                 img = np.asarray(img)
