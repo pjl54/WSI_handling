@@ -116,17 +116,19 @@ class wsi(dict):
         return img        
 
     def resize_points(self,points,resize_factor):
-        
-        for k, pointSet in enumerate(points):
-            points[k] = [(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet]
+                
+        points = [[(int(p[0] * resize_factor), int(p[1] * resize_factor)) for p in pointSet] for pointSet in points]
         
         return points.copy()
                                                 
     def mask_out_tile(self,desired_mpp,coords,wh,colors_to_use=None,annotation_idx=None,custom_colors=[],point_dict=None,wh_at_base=False):
         """Returns the mask of a tile"""
     
-        if wh_at_base:        
+        if wh_at_base:   
+            base_wh = wh
             wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh])
+        else:
+            base_wh = tuple([self.get_coord_at_mpp(dimension,output_mpp=self['mpp'],input_mpp=desired_mpp) for dimension in wh])
     
         if point_dict:
             points = point_dict['points']
@@ -135,37 +137,25 @@ class wsi(dict):
             points, map_idx = self.get_points(colors_to_use,custom_colors)            
 
         resize_factor = self["mpp"] / desired_mpp                
-
-        # this rounding may de-align the mask and RGB image
-        points = self.resize_points(points,resize_factor)
                 
         if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
             largest_idx = self.get_largest_region(points)
             points = [points[largest_idx]]
         elif annotation_idx is not None:
             points = [points[annotation_idx]]
-
+            
+        outerbounds = [coords[0]+base_wh[0],coords[1]+base_wh[1]]
+        points = [pointSet for pointSet in points if any([((p[0] > coords[0]) and (p[0] < outerbounds[0])) or ((p[1] > coords[1]) and (p[1] < outerbounds[1])) for p in pointSet ])]
+        
+        # this rounding may de-align the mask and RGB image
+        points = self.resize_points(points,resize_factor)
 
         coords = tuple([int(c * resize_factor) for c in coords])
-
-        polygon = np.array([[coords[0],coords[1]],[coords[0]+wh[0],coords[1]],[coords[0]+wh[0],coords[1]+wh[1]],[coords[0],coords[1]+wh[1]]])
-
-        new_points = []
-        for k, point_set in enumerate(points):                
-            if(all(mpl.path.Path(np.array(point_set)).contains_points(polygon))):
-                new_points.append(polygon)
-
-                region_point_set = [point for index,point in enumerate(point_set) if point[0]>coords[0] and point[0]<(coords[0]+wh[0])
-                                       and point[1]>coords[1] and point[1]<(coords[1]+wh[1])]
-
-                new_points.append(region_point_set)
-
         mask = np.zeros((wh[1],wh[0]),dtype=np.uint8)
 
-        for k, pointSet in enumerate(points):
-            points[k] = [(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet]
+        points = [[(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet] for pointSet in points]
 
-        for annCount, pointSet in enumerate(points):        
+        for annCount, pointSet in enumerate(points):                    
             cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
         
         return mask
@@ -259,7 +249,7 @@ class wsi(dict):
 
         return bounding_box
     
-    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,wh_add=(0,0),return_img=True,custom_colors=[],restrict_to_anno=True):
+    def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,wh_add=(0,0),return_img=True,custom_colors=[],restrict_to_anno=True,all_annos=False):
         """Returns an RGB image of the specified annotated region."""
             
         points, map_idx = self.get_points(colors_to_use,custom_colors)
@@ -286,17 +276,19 @@ class wsi(dict):
             coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
             wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
                              
-            if(tile_coords and tile_wh):
+            if(tile_coords):
                 coords = tuple([coords[0]+tile_coords[0],coords[1]+tile_coords[1]])
                 
-                if(restrict_to_anno):
-                    if(coords[0]+tile_wh[0] > bounding_box[2]):
-                        tile_wh[0] = bounding_box[2] - coords[0]
-
-                    if(coords[1]+tile_wh[1] > bounding_box[3]):
-                        tile_wh[1] = bounding_box[3] - coords[1]
-
+            if(tile_wh):
                 wh = tile_wh
+                
+            if(restrict_to_anno):
+                if(coords[0]+tile_wh[0] > bounding_box[2]):
+                    tile_wh[0] = bounding_box[2] - coords[0]
+
+                if(coords[1]+tile_wh[1] > bounding_box[3]):
+                    tile_wh[1] = bounding_box[3] - coords[1]
+                
             
             wh = [wh[k]+wh_add[k] for k in [0,1]]
                         
@@ -307,6 +299,8 @@ class wsi(dict):
                 img = None
 
             wh = [self.get_coord_at_mpp(dimension,output_mpp=desired_mpp) for dimension in wh]            
+            
+            point_dict = None if all_annos else point_dict
             mask = self.mask_out_tile(desired_mpp,coords,wh,colors_to_use=colors_to_use,point_dict=point_dict)
                         
             if(mask_out_roi and return_img):
