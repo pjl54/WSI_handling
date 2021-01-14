@@ -145,7 +145,7 @@ class wsi(dict):
             points = [points[annotation_idx]]
             
         outerbounds = [coords[0]+base_wh[0],coords[1]+base_wh[1]]
-        points = [pointSet for pointSet in points if any([((p[0] > coords[0]) and (p[0] < outerbounds[0])) or ((p[1] > coords[1]) and (p[1] < outerbounds[1])) for p in pointSet ])]
+        points = [pointSet for pointSet in points if any([((p[0] > coords[0]) and (p[0] < outerbounds[0])) and ((p[1] > coords[1]) and (p[1] < outerbounds[1])) for p in pointSet ])]
         
         # this rounding may de-align the mask and RGB image
         points = self.resize_points(points,resize_factor)
@@ -258,20 +258,19 @@ class wsi(dict):
             print('No annotations of selected color')
             img = None
             mask = None
-        else:
-        
-            poly_list = [Polygon(point_set) for point_set in points]
-
+        else:        
 
             if type(annotation_idx) == str and annotation_idx.lower() == 'largest':
+                poly_list = [Polygon(point_set) for point_set in points]
                 areas = [poly.area for poly in poly_list]
                 annotation_idx = areas.index(max(areas))
+                bounding_box = poly_list[annotation_idx].bounds
+            else:
+                bounding_box = Polygon(points[annotation_idx]).bounds
 
             point_dict = dict()
             point_dict['points'] = [points[annotation_idx]]
-            point_dict['map_idx'] = [map_idx[annotation_idx]]
-            
-            bounding_box = poly_list[annotation_idx].bounds
+            point_dict['map_idx'] = [map_idx[annotation_idx]]                                    
 
             coords = tuple([int(bounding_box[0]),int(bounding_box[1])])
             wh = tuple([int(bounding_box[2]-bounding_box[0]),int(bounding_box[3]-bounding_box[1])])
