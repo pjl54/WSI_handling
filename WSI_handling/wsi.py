@@ -281,7 +281,7 @@ class wsi(dict):
             if(tile_wh):
                 wh = tile_wh
                 
-            if(restrict_to_anno):
+            if(restrict_to_anno and tile_wh):
                 if(coords[0]+tile_wh[0] > bounding_box[2]):
                     tile_wh[0] = bounding_box[2] - coords[0]
 
