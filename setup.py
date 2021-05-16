@@ -8,15 +8,14 @@ with open(path.join(this_directory, 'README.md')) as f:
 setup(
   name = 'WSI_handling',         
   packages = ['WSI_handling'],   
-  version = '0.16',
+  version = '0.16.1',
   license='MIT',        
   description = 'Convienent handling of annotated whole slide images',
   long_description=long_description,
   long_description_content_type='text/markdown',
   author = 'Patrick Leo',                   
   author_email = 'pjl54@case.edu',      
-  url = 'https://github.com/pjl54/WSI_handling',   
-  download_url = 'https://github.com/pjl54/WSI_handling/archive/v0.16.tar.gz',
+  url = 'https://github.com/pjl54/WSI_handling',
   keywords = ['whole slide image', 'digital pathology', 'annotations'],
   install_requires=[
           'numpy',

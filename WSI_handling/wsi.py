@@ -144,19 +144,23 @@ class wsi(dict):
         elif annotation_idx is not None:
             points = [points[annotation_idx]]
             
-        outerbounds = [coords[0]+base_wh[0],coords[1]+base_wh[1]]
-        points = [pointSet for pointSet in points if any([((p[0] > coords[0]) and (p[0] < outerbounds[0])) and ((p[1] > coords[1]) and (p[1] < outerbounds[1])) for p in pointSet ])]
+        tile_poly = Polygon([(coords[0],coords[1]),(coords[0],coords[1]+base_wh[1]),(coords[0]+base_wh[0],coords[1]+base_wh[1]),(coords[0]+base_wh[0],coords[1])])
         
-        # this rounding may de-align the mask and RGB image
-        points = self.resize_points(points,resize_factor)
-
-        coords = tuple([int(c * resize_factor) for c in coords])
         mask = np.zeros((wh[1],wh[0]),dtype=np.uint8)
+        
+        points_maps = [point_map for point_map in zip(points,map_idx) if tile_poly.intersects(Polygon(point_map[0]))]
+        if points_maps:
+            points,map_idx = zip(*points_maps)        
 
-        points = [[(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet] for pointSet in points]
+            # this rounding may de-align the mask and RGB image
+            points = self.resize_points(points,resize_factor)
 
-        for annCount, pointSet in enumerate(points):                    
-            cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
+            coords = tuple([int(c * resize_factor) for c in coords])        
+
+            points = [[(int(p[0] - coords[0]), int(p[1] - coords[1])) for p in pointSet] for pointSet in points]
+
+            for annCount, pointSet in enumerate(points):                    
+                cv2.fillPoly(mask,[np.asarray(pointSet).reshape((-1,1,2))],map_idx[annCount])
         
         return mask
 
