@@ -1,6 +1,36 @@
+# +
 import json
 import xml.etree.ElementTree as ET
 import numpy as np
+
+from pathlib import Path
+from shapely.geometry import Polygon
+from shapely.strtree import STRtree
+
+
+# -
+
+def get_points_base(wsi_object,colors_to_use,custom_colors=[]):
+    
+    color_key = ''.join([k for k in colors_to_use])
+    
+    # we can store the points for this combination to speed up getting it later
+    if color_key in wsi_object["stored_points"]:
+        return wsi_object["stored_points"][color_key].copy()
+    
+    if Path(wsi_object['annotation_fname']).suffix == '.xml':
+        points, map_idx = get_points_xml(wsi_object,colors_to_use,custom_colors)
+            
+    if Path(wsi_object['annotation_fname']).suffix == '.json':
+        points, map_idx = get_points_json(wsi_object,colors_to_use)
+        
+    point_polys = [Polygon(point) for point in points]
+    wsi_object["stored_points"][color_key] = []
+    wsi_object["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy(), 'polygons': point_polys.copy(), 'STRtree': STRtree(point_polys)}
+    
+    return wsi_object['stored_points'][color_key].copy()
+
+
 
 def color_ref_match_xml(colors_to_use,custom_colors):    
     """Given a string or list of strings corresponding to colors to use, returns the hexcodes of those colors"""
@@ -25,101 +55,86 @@ def get_points_xml(wsi_object,colors_to_use,custom_colors):
     color_map = color_ref_match_xml(colors_to_use,custom_colors)    
 
     color_key = ''.join([k[2] for k in color_map])
-    # we can store the points for this combination to speed up getting it later
-    if color_key in wsi_object["stored_points"]:
-        return wsi_object["stored_points"][color_key]["points"].copy(), wsi_object["stored_points"][color_key]["map_idx"].copy()
-    else:
-        full_map = color_ref_match_xml(None,custom_colors)
+    full_map = color_ref_match_xml(None,custom_colors)
 
-        # create element tree object
-        tree = ET.parse(wsi_object["annotation_fname"])
+    # create element tree object
+    tree = ET.parse(wsi_object["annotation_fname"])
 
-        # get root element
-        root = tree.getroot()        
+    # get root element
+    root = tree.getroot()        
 
-        map_idx = []
-        points = []
+    map_idx = []
+    points = []
 
-        for annotation in root.findall('Annotation'):        
-            line_color = int(annotation.get('LineColor'))        
-            mapped_idx = [item[1] for item in color_map if item[0] == line_color]
+    for annotation in root.findall('Annotation'):        
+        line_color = int(annotation.get('LineColor'))        
+        mapped_idx = [item[1] for item in color_map if item[0] == line_color]
 
-            if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
-                if('other' in [item[2] for item in color_map]):
-                    mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
+        if(not mapped_idx and not [item[1] for item in full_map if item[0] == line_color]):
+            if('other' in [item[2] for item in color_map]):
+                mapped_idx = [item[1] for item in color_map if item[2] == 'other']                    
 
-            if(mapped_idx):
-                if(isinstance(mapped_idx,list)):
-                    mapped_idx = mapped_idx[0]
+        if(mapped_idx):
+            if(isinstance(mapped_idx,list)):
+                mapped_idx = mapped_idx[0]
 
-                for regions in annotation.findall('Regions'):
-                    for annCount, region in enumerate(regions.findall('Region')):                                
-                        map_idx.append(mapped_idx)
+            for regions in annotation.findall('Regions'):
+                for annCount, region in enumerate(regions.findall('Region')):                                
+                    map_idx.append(mapped_idx)
 
-                        for vertices in region.findall('Vertices'):
-                            points.append([None] * len(vertices.findall('Vertex')))                    
-                            for k, vertex in enumerate(vertices.findall('Vertex')):
-                                points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
+                    for vertices in region.findall('Vertices'):
+                        points.append([None] * len(vertices.findall('Vertex')))                    
+                        for k, vertex in enumerate(vertices.findall('Vertex')):
+                            points[-1][k] = (int(float(vertex.get('X'))), int(float(vertex.get('Y'))))                                                                            
 
-        sort_order = [x[1] for x in color_map]
-        new_order = []
-        for x in sort_order:
-            new_order.extend([index for index, v in enumerate(map_idx) if v == x])
+    sort_order = [x[1] for x in color_map]
+    new_order = []
+    for x in sort_order:
+        new_order.extend([index for index, v in enumerate(map_idx) if v == x])
 
-        points = [points[x] for x in new_order]
-        map_idx = [map_idx[x] for x in new_order]
+    points = [points[x] for x in new_order]
+    map_idx = [map_idx[x] for x in new_order]
 
-        wsi_object["stored_points"][color_key] = []
-        wsi_object["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
-
-        return points, map_idx
+    return points, map_idx
 
 def get_points_json(wsi_object,colors_to_use):
     
     colors_to_use = [c.lower() for c in colors_to_use]
     
-    """Given a set of annotation types, parses the json file to get those annotations as lists of verticies"""
-    color_key = ''.join([k for k in colors_to_use])
+    """Given a set of annotation types, parses the json file to get those annotations as lists of verticies"""    
     
     mapper = list(range(1,len(colors_to_use)+1))
     map_idx = []
-    
-    # we can store the points for this combination to speed up getting it later
-    if color_key in wsi_object["stored_points"]:
-        return wsi_object["stored_points"][color_key]["points"].copy(), wsi_object["stored_points"][color_key]["map_idx"].copy()
-    else:
-        with open(wsi_object['annotation_fname']) as f:
-            json_anno = json.load(f)
-            points = []
-            for idx,color in enumerate(colors_to_use):
-                for anno in json_anno:
-                    
-                    if 'classification' not in anno['properties']:
-                        anno['properties']['classification'] = dict()
-                    if 'name' not in anno['properties']['classification']:
-                        anno['properties']['classification']['name'] = 'null'
+        
+    with open(wsi_object['annotation_fname']) as f:
+        json_anno = json.load(f)
+        points = []
+        for idx,color in enumerate(colors_to_use):
+            for anno in json_anno:
 
-                    if anno['properties']['classification']['name'].lower() == color:
+                if 'classification' not in anno['properties']:
+                    anno['properties']['classification'] = dict()
+                if 'name' not in anno['properties']['classification']:
+                    anno['properties']['classification']['name'] = 'null'
 
-                        geom_type = anno['geometry']['type']
-                        coordinates = anno['geometry']['coordinates']
+                if anno['properties']['classification']['name'].lower() == color:
 
-                        if geom_type == 'MultiPolygon':
-                            for roi in coordinates:
-                                for sub_roi in roi:
-                                    points.append([(coord[0], coord[1]) for coord in sub_roi])
-                                    map_idx.append(mapper[idx])
-                        elif geom_type == 'Polygon':
-                            for coords in coordinates:
-                                points.append([(coord[0], coord[1]) for coord in coords])
+                    geom_type = anno['geometry']['type']
+                    coordinates = anno['geometry']['coordinates']
+
+                    if geom_type == 'MultiPolygon':
+                        for roi in coordinates:
+                            for sub_roi in roi:
+                                points.append([(coord[0], coord[1]) for coord in sub_roi])
                                 map_idx.append(mapper[idx])
-                        elif geom_type == 'LineString':            
-                            points.append([(coord[0], coord[1]) for coord in coords])                        
+                    elif geom_type == 'Polygon':
+                        for coords in coordinates:
+                            points.append([(coord[0], coord[1]) for coord in coords])
                             map_idx.append(mapper[idx])
+                    elif geom_type == 'LineString':            
+                        points.append([(coord[0], coord[1]) for coord in coords])                        
+                        map_idx.append(mapper[idx])
 
 
-            wsi_object["stored_points"][color_key] = []
-            wsi_object["stored_points"][color_key] = {'points':points.copy(),'map_idx':map_idx.copy()}           
-
-        return points, map_idx
+    return points, map_idx
 

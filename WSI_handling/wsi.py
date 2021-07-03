@@ -16,12 +16,13 @@ from PIL import Image,ImageDraw
 import cv2
 
 from shapely.geometry import Polygon
+from shapely.strtree import STRtree
+
 import openslide
 
 from pathlib import Path
 
-from .annotation_handlers import get_points_xml
-from .annotation_handlers import get_points_json
+from .annotation_handlers import get_points_base
 
 # %%
 
@@ -60,15 +61,12 @@ class wsi(dict):
             if img_dims is not None:
                 self["img_dims"] = [img_dims]   
         
-    def get_points(self,colors_to_use,custom_colors):        
+    def get_points(self,colors_to_use,custom_colors=[]):        
         
-        if Path(self['annotation_fname']).suffix == '.xml':
-            points, map_idx = get_points_xml(self,colors_to_use,custom_colors)
+        stored_points = get_points_base(self,colors_to_use,custom_colors)
             
-        if Path(self['annotation_fname']).suffix == '.json':
-            points, map_idx = get_points_json(self,colors_to_use)
-            
-        return points, map_idx
+        # precomputing polygons and STRTree makes later operations faster, but takes a few extra milliseconds. 
+        return stored_points['points'], stored_points['map_idx'],stored_points['polygons'] ,stored_points['STRtree']
     
     def get_largest_region(self,points):                
         
@@ -133,8 +131,10 @@ class wsi(dict):
         if point_dict:
             points = point_dict['points']
             map_idx = point_dict['map_idx']
+            point_polys = []
+            point_tree = []
         else:
-            points, map_idx = self.get_points(colors_to_use,custom_colors)            
+            points, map_idx,point_polys,point_tree = self.get_points(colors_to_use,custom_colors)            
 
         resize_factor = self["mpp"] / desired_mpp                
                 
@@ -146,9 +146,19 @@ class wsi(dict):
             
         tile_poly = Polygon([(coords[0],coords[1]),(coords[0],coords[1]+base_wh[1]),(coords[0]+base_wh[0],coords[1]+base_wh[1]),(coords[0]+base_wh[0],coords[1])])
         
-        mask = np.zeros((wh[1],wh[0]),dtype=np.uint8)
+        mask = np.zeros((wh[1],wh[0]),dtype=np.uint8)                
         
-        points_maps = [point_map for point_map in zip(points,map_idx) if tile_poly.intersects(Polygon(point_map[0]))]
+#         points_maps = [point_map for point_map in zip(points,map_idx) if tile_poly.intersects(Polygon(point_map[0]))]
+#         points_maps = [point_map for point_map in zip(points,map_idx) if tile_poly.intersects(Polygon(point_map[0]))]
+        
+        if not point_polys:
+            point_polys = [Polygon(point) for point in points]
+            point_tree = STRtree(point_polys)
+            
+        index_by_id = dict((id(pt), i) for i, pt in enumerate(point_polys))
+        intersecting_points = [index_by_id[id(pt)] for pt in point_tree.query(tile_poly)]
+        
+        points_maps = [point_map for idx,point_map in enumerate(zip(points,map_idx)) if idx in intersecting_points]
         if points_maps:
             points,map_idx = zip(*points_maps)        
 
@@ -235,7 +245,7 @@ class wsi(dict):
         return wsi_image
     
     def get_dimensions_of_annotation(self,colors_to_use,annotation_idx,custom_colors=[]):
-        points, _ = self.get_points(colors_to_use,custom_colors)
+        points, _,_,_ = self.get_points(colors_to_use,custom_colors)
         
         if(not points):
             print('No annotations of selected color')
@@ -256,7 +266,7 @@ class wsi(dict):
     def get_annotated_region(self,desired_mpp,colors_to_use,annotation_idx,mask_out_roi=True,tile_coords=None,tile_wh=None,wh_add=(0,0),return_img=True,custom_colors=[],restrict_to_anno=True,all_annos=False):
         """Returns an RGB image of the specified annotated region."""
             
-        points, map_idx = self.get_points(colors_to_use,custom_colors)
+        points, map_idx,_, _ = self.get_points(colors_to_use,custom_colors)
         
         if(not points):
             print('No annotations of selected color')
